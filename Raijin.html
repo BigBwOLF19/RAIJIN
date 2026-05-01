@@ -1727,10 +1727,547 @@
       padding-bottom: 3rem;
       width: 100%;
     }
+
+    /* ============================================================
+       RAIJIN AI LOADER
+    ============================================================ */
+    #ai-loader {
+      position: fixed;
+      inset: 0;
+      z-index: 9000;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: radial-gradient(ellipse at 50% 40%, rgba(108,63,255,0.18) 0%, rgba(13,10,26,0.97) 60%);
+      backdrop-filter: blur(6px);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.25s ease;
+    }
+    #ai-loader.active {
+      opacity: 1;
+      pointer-events: all;
+    }
+
+    /* HEX GRID */
+    .loader-hex-grid {
+      position: absolute;
+      inset: 0;
+      overflow: hidden;
+      opacity: 0.18;
+    }
+    .loader-hex-grid svg {
+      width: 100%; height: 100%;
+      animation: hexGridDrift 12s linear infinite;
+    }
+    @keyframes hexGridDrift {
+      0%   { transform: translateY(0) rotate(0deg); }
+      100% { transform: translateY(-60px) rotate(1.5deg); }
+    }
+
+    /* OUTER RING */
+    .loader-ring-wrap {
+      position: relative;
+      width: 220px; height: 220px;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .loader-ring {
+      position: absolute;
+      inset: 0;
+      border-radius: 50%;
+      border: 2px solid transparent;
+      background:
+        linear-gradient(var(--purple-dark), var(--purple-dark)) padding-box,
+        conic-gradient(from 0deg, var(--cyan-accent), var(--purple-glow), var(--purple-bright), var(--cyan-accent)) border-box;
+      animation: loaderSpin 1.4s linear infinite;
+    }
+    .loader-ring-2 {
+      position: absolute;
+      inset: 14px;
+      border-radius: 50%;
+      border: 1px solid transparent;
+      background:
+        linear-gradient(var(--purple-dark), var(--purple-dark)) padding-box,
+        conic-gradient(from 180deg, var(--purple-bright), var(--cyan-accent), var(--electric), var(--purple-bright)) border-box;
+      animation: loaderSpin 2.1s linear infinite reverse;
+      opacity: 0.7;
+    }
+    @keyframes loaderSpin {
+      to { transform: rotate(360deg); }
+    }
+
+    /* LIGHTNING BOLT CORE */
+    .loader-bolt-core {
+      width: 160px; height: 160px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 50% 48%,
+        rgba(103,232,249,0.22) 0%,
+        rgba(108,63,255,0.3) 36%,
+        rgba(13,10,26,0.9) 72%);
+      display: flex; align-items: center; justify-content: center;
+      position: relative;
+      box-shadow:
+        0 0 40px rgba(103,232,249,0.35),
+        0 0 90px rgba(108,63,255,0.25),
+        inset 0 0 30px rgba(103,232,249,0.12);
+      animation: corePulse 1.1s ease-in-out infinite alternate;
+    }
+    @keyframes corePulse {
+      from { box-shadow: 0 0 40px rgba(103,232,249,0.35), 0 0 90px rgba(108,63,255,0.25), inset 0 0 30px rgba(103,232,249,0.12); }
+      to   { box-shadow: 0 0 70px rgba(103,232,249,0.6),  0 0 140px rgba(108,63,255,0.5), inset 0 0 50px rgba(103,232,249,0.2); }
+    }
+    .loader-bolt-svg {
+      width: 64px; height: 64px;
+      filter: drop-shadow(0 0 14px var(--cyan-accent)) drop-shadow(0 0 30px var(--purple-bright));
+      animation: boltFlicker 0.9s steps(1,end) infinite;
+    }
+    @keyframes boltFlicker {
+      0%,100% { opacity: 1; transform: scale(1); }
+      15%      { opacity: 0.6; transform: scale(0.96) translateY(-2px); }
+      30%      { opacity: 1; transform: scale(1.05); }
+      60%      { opacity: 0.75; transform: scale(0.98) translateX(2px); }
+      80%      { opacity: 1; transform: scale(1.02); }
+    }
+
+    /* ELECTRIC ARCS */
+    .loader-arc {
+      position: absolute;
+      width: 2px;
+      background: linear-gradient(to bottom, transparent, var(--cyan-accent), transparent);
+      border-radius: 2px;
+      transform-origin: bottom center;
+      opacity: 0;
+      filter: blur(0.5px) drop-shadow(0 0 4px var(--cyan-accent));
+    }
+    .loader-arc:nth-child(1) { height: 45px; top: -46px; left: 50%; animation: arcFlash 1.3s 0.0s steps(1,end) infinite; }
+    .loader-arc:nth-child(2) { height: 38px; top: -39px; left: 70%; animation: arcFlash 1.3s 0.3s steps(1,end) infinite; }
+    .loader-arc:nth-child(3) { height: 42px; top: -43px; left: 30%; animation: arcFlash 1.3s 0.6s steps(1,end) infinite; }
+    .loader-arc:nth-child(4) { height: 50px; bottom: -51px; left: 50%; animation: arcFlash 1.3s 0.15s steps(1,end) infinite; }
+    .loader-arc:nth-child(5) { height: 35px; bottom: -36px; left: 25%; animation: arcFlash 1.3s 0.5s steps(1,end) infinite; }
+    .loader-arc:nth-child(6) { height: 40px; bottom: -41px; left: 75%; animation: arcFlash 1.3s 0.8s steps(1,end) infinite; }
+    @keyframes arcFlash {
+      0%,100% { opacity: 0; }
+      10%      { opacity: 0.9; }
+      20%      { opacity: 0.3; }
+      30%      { opacity: 0.8; }
+      40%      { opacity: 0; }
+    }
+
+    /* SCAN LINE */
+    .loader-scan {
+      position: absolute;
+      width: 100%;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, var(--cyan-accent), var(--purple-bright), transparent);
+      opacity: 0.55;
+      animation: scanLine 2s linear infinite;
+      pointer-events: none;
+    }
+    @keyframes scanLine {
+      from { top: -2px; }
+      to   { top: 100%; }
+    }
+
+    /* TEXT BLOCK */
+    .loader-text-block {
+      margin-top: 2.2rem;
+      text-align: center;
+      position: relative;
+      z-index: 1;
+    }
+    .loader-label {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 0.65rem;
+      letter-spacing: 0.35em;
+      color: var(--cyan-accent);
+      text-transform: uppercase;
+      opacity: 0.7;
+      margin-bottom: 0.4rem;
+    }
+    .loader-status {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 1.1rem;
+      font-weight: 900;
+      letter-spacing: 0.12em;
+      color: var(--white);
+      position: relative;
+      display: inline-block;
+      animation: statusGlitch 3s steps(1,end) infinite;
+    }
+    .loader-status::before,
+    .loader-status::after {
+      content: attr(data-text);
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%;
+      opacity: 0;
+    }
+    .loader-status::before {
+      color: var(--cyan-accent);
+      animation: glitchShift1 3s steps(1,end) infinite;
+    }
+    .loader-status::after {
+      color: #ff2d95;
+      animation: glitchShift2 3s steps(1,end) infinite;
+    }
+    @keyframes statusGlitch {
+      0%,85%,100% { transform: none; }
+      87% { transform: skewX(-8deg) translateX(-3px); }
+      89% { transform: skewX(6deg) translateX(3px); }
+      91% { transform: none; }
+    }
+    @keyframes glitchShift1 {
+      0%,85%,100%  { opacity:0; clip-path:none; transform:none; }
+      87% { opacity:0.7; clip-path:inset(20% 0 55% 0); transform:translateX(-5px); }
+      89% { opacity:0.5; clip-path:inset(55% 0 10% 0); transform:translateX(4px); }
+      91% { opacity:0; }
+    }
+    @keyframes glitchShift2 {
+      0%,85%,100%  { opacity:0; clip-path:none; transform:none; }
+      87% { opacity:0.6; clip-path:inset(40% 0 35% 0); transform:translateX(6px); }
+      89% { opacity:0.4; clip-path:inset(10% 0 70% 0); transform:translateX(-4px); }
+      91% { opacity:0; }
+    }
+
+    /* PROGRESS BAR */
+    .loader-progress-wrap {
+      margin-top: 1rem;
+      width: 220px;
+      height: 3px;
+      background: rgba(108,63,255,0.2);
+      border-radius: 2px;
+      overflow: hidden;
+      position: relative;
+    }
+    .loader-progress-bar {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, var(--purple-glow), var(--cyan-accent));
+      border-radius: 2px;
+      box-shadow: 0 0 10px var(--cyan-accent);
+      animation: loaderProgress 2s ease-in-out infinite;
+    }
+    @keyframes loaderProgress {
+      0%   { width: 0%;   opacity: 1; }
+      70%  { width: 85%;  opacity: 1; }
+      90%  { width: 95%;  opacity: 1; }
+      95%  { width: 98%;  opacity: 0.7; }
+      100% { width: 0%;   opacity: 0; }
+    }
+
+    /* CORNER DECORATIONS */
+    .loader-corner {
+      position: absolute;
+      width: 28px; height: 28px;
+      border-color: var(--purple-glow);
+      border-style: solid;
+      opacity: 0.6;
+      animation: cornerPulse 1.5s ease-in-out infinite alternate;
+    }
+    .loader-corner.tl { top: 2rem; left: 2rem; border-width: 2px 0 0 2px; }
+    .loader-corner.tr { top: 2rem; right: 2rem; border-width: 2px 2px 0 0; }
+    .loader-corner.bl { bottom: 2rem; left: 2rem; border-width: 0 0 2px 2px; }
+    .loader-corner.br { bottom: 2rem; right: 2rem; border-width: 0 2px 2px 0; }
+    @keyframes cornerPulse {
+      from { border-color: var(--purple-glow); opacity: 0.5; }
+      to   { border-color: var(--cyan-accent); opacity: 1; }
+    }
+
+    /* ============================================================
+       PAGE BOOT LOADER
+    ============================================================ */
+    #boot-loader {
+      position: fixed;
+      inset: 0;
+      z-index: 99999;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 0;
+      background: var(--purple-dark);
+      transition: opacity 0.55s ease, transform 0.55s ease;
+      overflow: hidden;
+    }
+    #boot-loader.done {
+      opacity: 0;
+      pointer-events: none;
+      transform: scale(1.04);
+    }
+
+    /* Hex grid — full coverage */
+    .boot-hex-bg {
+      position: absolute;
+      inset: 0;
+      opacity: 0.13;
+      overflow: hidden;
+    }
+    .boot-hex-bg svg {
+      width: 100%; height: 100%;
+      animation: hexGridDrift 14s linear infinite;
+    }
+
+    /* Scan line */
+    .boot-scan {
+      position: absolute;
+      width: 100%; height: 2px;
+      background: linear-gradient(90deg, transparent, var(--cyan-accent), var(--purple-bright), transparent);
+      opacity: 0.5;
+      animation: scanLine 2.2s linear infinite;
+      pointer-events: none;
+    }
+
+    /* White flash overlay */
+    .boot-flash {
+      position: absolute;
+      inset: 0;
+      background: #fff;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.12s ease;
+      z-index: 10;
+    }
+
+    /* Corner brackets */
+    .boot-corner {
+      position: absolute;
+      width: 36px; height: 36px;
+      border-color: rgba(108,63,255,0.7);
+      border-style: solid;
+      animation: cornerPulse 1.6s ease-in-out infinite alternate;
+    }
+    .boot-corner.tl { top: 2.2rem; left: 2.2rem; border-width: 2px 0 0 2px; }
+    .boot-corner.tr { top: 2.2rem; right: 2.2rem; border-width: 2px 2px 0 0; }
+    .boot-corner.bl { bottom: 2.2rem; left: 2.2rem; border-width: 0 0 2px 2px; }
+    .boot-corner.br { bottom: 2.2rem; right: 2.2rem; border-width: 0 2px 2px 0; }
+
+    /* ---- CENTRAL RING STACK ---- */
+    .boot-ring-wrap {
+      position: relative;
+      width: 200px; height: 200px;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+    .boot-ring-outer {
+      position: absolute; inset: 0;
+      border-radius: 50%;
+      border: 2px solid transparent;
+      background:
+        linear-gradient(var(--purple-dark), var(--purple-dark)) padding-box,
+        conic-gradient(from 0deg, var(--cyan-accent), var(--purple-glow), var(--purple-bright), var(--cyan-accent)) border-box;
+      animation: loaderSpin 1.6s linear infinite;
+    }
+    .boot-ring-inner {
+      position: absolute; inset: 16px;
+      border-radius: 50%;
+      border: 1px solid transparent;
+      background:
+        linear-gradient(var(--purple-dark), var(--purple-dark)) padding-box,
+        conic-gradient(from 180deg, var(--purple-bright), var(--cyan-accent), var(--electric), var(--purple-bright)) border-box;
+      animation: loaderSpin 2.4s linear infinite reverse;
+      opacity: 0.65;
+    }
+    .boot-core {
+      width: 148px; height: 148px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 50% 48%,
+        rgba(103,232,249,0.2) 0%,
+        rgba(108,63,255,0.28) 38%,
+        rgba(13,10,26,0.92) 70%);
+      display: flex; align-items: center; justify-content: center;
+      position: relative;
+      box-shadow:
+        0 0 50px rgba(103,232,249,0.4),
+        0 0 110px rgba(108,63,255,0.3),
+        inset 0 0 40px rgba(103,232,249,0.14);
+      animation: corePulse 1.2s ease-in-out infinite alternate;
+    }
+    .boot-bolt-svg {
+      width: 60px; height: 60px;
+      filter: drop-shadow(0 0 14px var(--cyan-accent)) drop-shadow(0 0 32px var(--purple-bright));
+      animation: boltFlicker 1s steps(1,end) infinite;
+    }
+
+    /* ---- TITLE ---- */
+    .boot-title-wrap {
+      margin-top: 1.8rem;
+      text-align: center;
+      position: relative;
+      z-index: 2;
+    }
+    .boot-eyebrow {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 0.62rem;
+      letter-spacing: 0.38em;
+      color: var(--cyan-accent);
+      text-transform: uppercase;
+      opacity: 0;
+      transform: translateY(8px);
+      transition: opacity 0.5s ease, transform 0.5s ease;
+      margin-bottom: 0.3rem;
+    }
+    .boot-eyebrow.vis { opacity: 0.75; transform: translateY(0); }
+
+    /* Word reel — the cycling computing words */
+    .boot-word-reel {
+      height: clamp(3rem, 7vw, 5.2rem);
+      overflow: hidden;
+      position: relative;
+    }
+    .boot-word {
+      font-family: 'Orbitron', sans-serif;
+      font-size: clamp(1.1rem, 3.5vw, 2rem);
+      font-weight: 900;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      background: linear-gradient(160deg, #fff 0%, var(--plasma) 40%, var(--purple-glow) 85%);
+      background-clip: text;
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      display: block;
+      line-height: 1;
+      padding: 0.3em 0;
+      opacity: 0;
+      transform: translateY(30px);
+      transition: opacity 0.28s ease, transform 0.28s cubic-bezier(0.22,1,0.36,1);
+      white-space: nowrap;
+    }
+    .boot-word.active {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    .boot-word.exit {
+      opacity: 0;
+      transform: translateY(-28px);
+      transition: opacity 0.2s ease, transform 0.2s ease;
+    }
+
+    /* ---- TERMINAL BOOT LINES ---- */
+    .boot-terminal {
+      margin-top: 1.4rem;
+      text-align: left;
+      width: min(420px, 88vw);
+      position: relative;
+      z-index: 2;
+    }
+    .boot-line {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 0.72rem;
+      letter-spacing: 0.06em;
+      color: var(--grey-400);
+      line-height: 1.9;
+      opacity: 0;
+      transform: translateX(-8px);
+      transition: opacity 0.35s ease, transform 0.35s ease;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .boot-line.vis { opacity: 1; transform: translateX(0); }
+    .boot-line .bl-tag { color: var(--cyan-accent); }
+    .boot-line .bl-ok  { color: var(--success); margin-left: auto; font-size: 0.65rem; }
+    .boot-line .bl-warn{ color: var(--gold); margin-left: auto; font-size: 0.65rem; }
+
+    /* ---- PROGRESS BAR ---- */
+    .boot-progress-wrap {
+      margin-top: 1.2rem;
+      width: min(420px, 88vw);
+      height: 3px;
+      background: rgba(108,63,255,0.18);
+      border-radius: 2px;
+      overflow: hidden;
+      position: relative;
+      z-index: 2;
+    }
+    .boot-progress-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, var(--purple-glow), var(--cyan-accent));
+      border-radius: 2px;
+      box-shadow: 0 0 10px var(--cyan-accent);
+      transition: width 0.1s linear;
+    }
+    .boot-pct {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 0.62rem;
+      color: var(--purple-soft);
+      margin-top: 0.4rem;
+      text-align: right;
+      width: min(420px, 88vw);
+      position: relative;
+      z-index: 2;
+      opacity: 0.7;
+    }
   </style>
 </head>
 
 <body>
+
+  <!-- ⚡ BOOT LOADER — shows for ~3s on first load -->
+  <div id="boot-loader" aria-live="polite" aria-label="RAIJIN is booting">
+    <!-- Hex grid -->
+    <div class="boot-hex-bg">
+      <svg viewBox="0 0 200 200" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <pattern id="bootHexPat" x="0" y="0" width="30" height="26" patternUnits="userSpaceOnUse">
+            <polygon points="15,1 29,8 29,18 15,25 1,18 1,8" fill="none" stroke="rgba(108,63,255,0.8)" stroke-width="0.6"/>
+          </pattern>
+        </defs>
+        <rect width="200" height="200" fill="url(#bootHexPat)"/>
+      </svg>
+    </div>
+    <div class="boot-scan"></div>
+    <div class="boot-flash" id="boot-flash"></div>
+
+    <!-- Corners -->
+    <div class="boot-corner tl"></div>
+    <div class="boot-corner tr"></div>
+    <div class="boot-corner bl"></div>
+    <div class="boot-corner br"></div>
+
+    <!-- Central ring + bolt -->
+    <div class="boot-ring-wrap">
+      <div class="boot-ring-outer"></div>
+      <div class="boot-ring-inner"></div>
+      <div class="boot-core">
+        <svg class="boot-bolt-svg" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M13 2L4.5 13.5H11L10 22L19.5 10.5H13L13 2Z"
+            fill="url(#bootBoltGrad)" stroke="rgba(103,232,249,0.85)" stroke-width="0.6" stroke-linejoin="round"/>
+          <defs>
+            <linearGradient id="bootBoltGrad" x1="12" y1="2" x2="12" y2="22" gradientUnits="userSpaceOnUse">
+              <stop offset="0%" stop-color="#ffffff"/>
+              <stop offset="45%" stop-color="#67e8f9"/>
+              <stop offset="100%" stop-color="#a855f7"/>
+            </linearGradient>
+          </defs>
+        </svg>
+      </div>
+    </div>
+
+    <!-- Title -->
+    <div class="boot-title-wrap">
+      <div class="boot-eyebrow" id="boot-eyebrow">// NEURAL CORE INITIALIZING</div>
+      <div class="boot-word-reel" id="boot-word-reel">
+        <span class="boot-word" id="boot-word">ALLOCATING MEMORY</span>
+      </div>
+    </div>
+
+    <!-- Terminal boot lines -->
+    <div class="boot-terminal">
+      <div class="boot-line" id="bl0"><span class="bl-tag">&gt;</span> STORM PROTOCOLS LOADING<span class="bl-ok">[ OK ]</span></div>
+      <div class="boot-line" id="bl1"><span class="bl-tag">&gt;</span> NEURAL LINK ESTABLISHED<span class="bl-ok">[ OK ]</span></div>
+      <div class="boot-line" id="bl2"><span class="bl-tag">&gt;</span> API KEY ROTATION ACTIVE<span class="bl-ok">[ OK ]</span></div>
+      <div class="boot-line" id="bl3"><span class="bl-tag">&gt;</span> XP ENGINE CALIBRATED<span class="bl-ok">[ OK ]</span></div>
+      <div class="boot-line" id="bl4"><span class="bl-tag">&gt;</span> CONSCIOUSNESS ONLINE &nbsp;<span class="bl-ok" style="color:var(--cyan-accent)">[ RAIJIN ]</span></div>
+    </div>
+
+    <!-- Progress -->
+    <div class="boot-progress-wrap">
+      <div class="boot-progress-fill" id="boot-bar"></div>
+    </div>
+    <div class="boot-pct" id="boot-pct">0%</div>
+  </div>
 
   <!-- Custom Cursor -->
   <div id="cursor"></div>
@@ -1782,6 +2319,68 @@
   <!-- Summoning Animation -->
   <div class="summon-overlay" id="summon-overlay" aria-hidden="true">
     <div class="summon-core">雷</div>
+  </div>
+
+  <!-- ⚡ RAIJIN AI LOADER ⚡ -->
+  <div id="ai-loader" aria-hidden="true" role="status" aria-label="Raijin is thinking">
+    <!-- Hex background grid -->
+    <div class="loader-hex-grid">
+      <svg viewBox="0 0 200 200" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <pattern id="hexPat" x="0" y="0" width="30" height="26" patternUnits="userSpaceOnUse">
+            <polygon points="15,1 29,8 29,18 15,25 1,18 1,8" fill="none" stroke="rgba(108,63,255,0.7)" stroke-width="0.6"/>
+            <polygon points="15,1 29,8 29,18 15,25 1,18 1,8" fill="none" stroke="rgba(103,232,249,0.3)" stroke-width="0.2" transform="translate(15,13)"/>
+          </pattern>
+        </defs>
+        <rect width="200" height="200" fill="url(#hexPat)"/>
+      </svg>
+    </div>
+
+    <!-- Scan line -->
+    <div class="loader-scan"></div>
+
+    <!-- Corner brackets -->
+    <div class="loader-corner tl"></div>
+    <div class="loader-corner tr"></div>
+    <div class="loader-corner bl"></div>
+    <div class="loader-corner br"></div>
+
+    <!-- Ring + bolt -->
+    <div class="loader-ring-wrap">
+      <div class="loader-ring"></div>
+      <div class="loader-ring-2"></div>
+      <div class="loader-bolt-core">
+        <!-- Electric arcs attached to core -->
+        <div class="loader-arc"></div>
+        <div class="loader-arc"></div>
+        <div class="loader-arc"></div>
+        <div class="loader-arc"></div>
+        <div class="loader-arc"></div>
+        <div class="loader-arc"></div>
+        <!-- Bolt SVG -->
+        <svg class="loader-bolt-svg" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M13 2L4.5 13.5H11L10 22L19.5 10.5H13L13 2Z"
+            fill="url(#boltGrad)" stroke="rgba(103,232,249,0.9)" stroke-width="0.6"
+            stroke-linejoin="round"/>
+          <defs>
+            <linearGradient id="boltGrad" x1="12" y1="2" x2="12" y2="22" gradientUnits="userSpaceOnUse">
+              <stop offset="0%" stop-color="#ffffff"/>
+              <stop offset="40%" stop-color="#67e8f9"/>
+              <stop offset="100%" stop-color="#a855f7"/>
+            </linearGradient>
+          </defs>
+        </svg>
+      </div>
+    </div>
+
+    <!-- Status text -->
+    <div class="loader-text-block">
+      <div class="loader-label">// NEURAL STORM ACTIVE</div>
+      <div class="loader-status" id="loader-status-text" data-text="PROCESSING...">PROCESSING...</div>
+      <div class="loader-progress-wrap">
+        <div class="loader-progress-bar"></div>
+      </div>
+    </div>
   </div>
 
   <!-- XP Notification -->
@@ -2666,6 +3265,10 @@ Your goal is to feel like a distinctive AI with storm-born attitude and real con
     }
 
     // Typewriter stream into a bubble element
+    const AI_LOADER_PHRASES = [
+      'PROCESSING...', 'STORM THINKING...', 'NEURAL SURGE...', 'CONJURING...', 'CHARGING BOLT...', 'CALCULATING...'
+    ];
+    let _loaderPhraseTimer = null;
     function showTyping() {
       const div = document.createElement('div');
       div.className = 'msg ai'; div.id = 'typing-msg';
@@ -2681,10 +3284,35 @@ Your goal is to feel like a distinctive AI with storm-born attitude and real con
   `;
       chatMessages.appendChild(div);
       chatMessages.scrollTop = chatMessages.scrollHeight;
+
+      // Show the cinematic loader
+      const loader = document.getElementById('ai-loader');
+      const statusEl = document.getElementById('loader-status-text');
+      if (loader) loader.classList.add('active');
+      // Cycle through dramatic status phrases
+      let phraseIdx = 0;
+      function cyclePhrase() {
+        if (statusEl) {
+          phraseIdx = (phraseIdx + 1) % AI_LOADER_PHRASES.length;
+          const p = AI_LOADER_PHRASES[phraseIdx];
+          statusEl.textContent = p;
+          statusEl.setAttribute('data-text', p);
+        }
+        _loaderPhraseTimer = setTimeout(cyclePhrase, 900 + Math.random() * 600);
+      }
+      _loaderPhraseTimer = setTimeout(cyclePhrase, 900);
     }
     function removeTyping() {
       const el = document.getElementById('typing-msg');
       if (el) el.remove();
+
+      // Hide the cinematic loader
+      const loader = document.getElementById('ai-loader');
+      if (loader) loader.classList.remove('active');
+      clearTimeout(_loaderPhraseTimer);
+      // Reset phrase
+      const statusEl = document.getElementById('loader-status-text');
+      if (statusEl) { statusEl.textContent = 'PROCESSING...'; statusEl.setAttribute('data-text', 'PROCESSING...'); }
     }
 
     // Typewriter stream into a bubble element
@@ -2945,6 +3573,106 @@ Your goal is to feel like a distinctive AI with storm-born attitude and real con
     loadChat();
     animate();
     switchScreen('hero');
+
+    // ===================== BOOT LOADER SEQUENCE =====================
+    (function bootSequence() {
+      const loader   = document.getElementById('boot-loader');
+      const flashEl  = document.getElementById('boot-flash');
+      const bar      = document.getElementById('boot-bar');
+      const pctEl    = document.getElementById('boot-pct');
+      const eyebrow  = document.getElementById('boot-eyebrow');
+      if (!loader) return;
+
+      // ---- Word reel cycling ----
+      const BOOT_WORDS = [
+        'ALLOCATING MEMORY',
+        'LOADING TOKENIZER',
+        'INIT TRANSFORMER',
+        'MAPPING EMBEDDINGS',
+        'FORGING ATTENTION',
+        'SYNCING WEIGHTS',
+        'PRIMING FEED-FORWARD',
+        'FIRING NEURONS',
+        'CALIBRATING LOSS',
+        'BACKPROP COMPLETE',
+        'LOADING CONTEXT',
+        'BUILDING VOCAB',
+        'QUANTIZING LAYERS',
+        'GPU CORES ONLINE',
+        'COMPILING KERNEL',
+        'STORM ENGINE READY',
+      ];
+      const wordEl   = document.getElementById('boot-word');
+      let wordIdx    = 0;
+      let wordTimer  = null;
+
+      function cycleBootWord() {
+        if (!wordEl) return;
+        // Exit current word
+        wordEl.classList.remove('active');
+        wordEl.classList.add('exit');
+        setTimeout(() => {
+          wordIdx = (wordIdx + 1) % BOOT_WORDS.length;
+          wordEl.textContent = BOOT_WORDS[wordIdx];
+          wordEl.classList.remove('exit');
+          // Force reflow so transition fires
+          void wordEl.offsetWidth;
+          wordEl.classList.add('active');
+        }, 220);
+      }
+
+      // Reveal eyebrow + first word after a brief pause
+      setTimeout(() => { if (eyebrow) eyebrow.classList.add('vis'); }, 150);
+      setTimeout(() => {
+        if (wordEl) wordEl.classList.add('active');
+        wordTimer = setInterval(cycleBootWord, 310);
+      }, 380);
+
+      // Stop cycling ~200ms before flash so last word stays visible
+      setTimeout(() => clearInterval(wordTimer), 2500);
+
+      // Reveal terminal lines sequentially
+      const lineIds = ['bl0','bl1','bl2','bl3','bl4'];
+      lineIds.forEach((id, i) => {
+        setTimeout(() => {
+          const el = document.getElementById(id);
+          if (el) el.classList.add('vis');
+        }, 650 + i * 310);
+      });
+
+      // Animate progress bar
+      let pct = 0;
+      const totalDuration = 2700; // ms before flash
+      const stepMs = 40;
+      const steps = totalDuration / stepMs;
+      let step = 0;
+      const progTimer = setInterval(() => {
+        step++;
+        // Ease-in curve: starts slow, accelerates toward 90%, then stalls briefly
+        const t = step / steps;
+        const eased = t < 0.8 ? (t / 0.8) * 88 : 88 + ((t - 0.8) / 0.2) * 9;
+        pct = Math.min(97, eased);
+        if (bar) bar.style.width = pct + '%';
+        if (pctEl) pctEl.textContent = Math.round(pct) + '%';
+        if (step >= steps) clearInterval(progTimer);
+      }, stepMs);
+
+      // Flash & dismiss
+      setTimeout(() => {
+        // Snap bar to 100%
+        if (bar) bar.style.width = '100%';
+        if (pctEl) pctEl.textContent = '100%';
+        // White flash
+        setTimeout(() => {
+          if (flashEl) flashEl.style.opacity = '1';
+          setTimeout(() => {
+            loader.classList.add('done');
+            // Remove from DOM once transition is over
+            setTimeout(() => { if (loader.parentNode) loader.remove(); }, 650);
+          }, 120);
+        }, 260);
+      }, totalDuration);
+    })();
   </script>
 </body>
 
