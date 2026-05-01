@@ -1,0 +1,14 @@
+{
+  "name": "raijin-chat",
+  "version": "1.0.0",
+  "description": "Local chat UI with Gemini proxy backend.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "dotenv": "^16.0.0",
+    "jsdom": "^29.0.2",
+    "puppeteer": "^24.42.0"
+  }
+}
