@@ -7,8 +7,8 @@ const dotenv = require('dotenv');
 dotenv.config();
 
 const DEFAULT_PORT = Number(process.env.PORT) || 3000;
-const MODEL = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
-const FALLBACK_MODEL = process.env.GEMINI_FALLBACK_MODEL || 'gemini-2.0-flash';
+const MODEL = process.env.OPENROUTER_MODEL || 'google/gemini-2.5-flash';
+const FALLBACK_MODEL = process.env.OPENROUTER_FALLBACK_MODEL || 'google/gemini-2.0-flash-exp';
 const PUBLIC_ROOT = __dirname;
 const MAX_RETRIES = 3;
 const DEFAULT_COOLDOWN_MS = (Number(process.env.KEY_COOLDOWN_SECONDS) || 60) * 1000;
@@ -20,7 +20,7 @@ class KeyPool {
   constructor(keys, defaultCooldownMs) {
     if (!keys || keys.length === 0) {
       throw new Error(
-        'No Gemini API keys found. Set GEMINI_API_KEYS (comma-separated) or GEMINI_API_KEY in .env'
+        'No OpenRouter API keys found. Set OPENROUTER_API_KEYS (comma-separated) or OPENROUTER_API_KEY in .env'
       );
     }
     this.keys = keys.map((k, i) => ({
@@ -83,11 +83,9 @@ class KeyPool {
     return this.keys.length;
   }
 
-  /** Parse 'retry in 42s' from Gemini error messages. */
+  /** Parse delay from OpenRouter error messages. */
   _parseRetryDelay(message) {
-    const match = String(message || '').match(/retry in\s+([\d.]+)s/i);
-    if (!match) return null;
-    return Math.max(5000, Math.ceil(Number(match[1]) * 1000));
+    return this.defaultCooldownMs;
   }
 
   /** Human-readable status for logging. */
@@ -103,9 +101,9 @@ class KeyPool {
   }
 }
 
-// Parse keys: GEMINI_API_KEYS (comma-separated) with fallback to GEMINI_API_KEY (singular).
+// Parse keys: OPENROUTER_API_KEYS (comma-separated) with fallback to OPENROUTER_API_KEY (singular).
 function loadApiKeys() {
-  const multi = process.env.GEMINI_API_KEYS;
+  const multi = process.env.OPENROUTER_API_KEYS;
   if (multi) {
     const keys = multi
       .split(',')
@@ -114,7 +112,7 @@ function loadApiKeys() {
     if (keys.length > 0) return keys;
   }
   // Fallback to singular key.
-  const single = process.env.GEMINI_API_KEY;
+  const single = process.env.OPENROUTER_API_KEY;
   if (single && single.trim()) return [single.trim()];
   return [];
 }
@@ -147,42 +145,8 @@ function sendFile(res, filePath, contentType) {
   });
 }
 
-function buildGeminiPrompt(messages) {
-  const systemMessage = messages.find((m) => m.role === 'system');
-  let prompt = '';
-  if (systemMessage) {
-    prompt += `${systemMessage.content.trim()}\n\n`;
-  }
-  messages.forEach((m) => {
-    if (m.role === 'user') {
-      prompt += `User: ${m.content.trim()}\n\n`;
-    } else if (m.role === 'assistant') {
-      prompt += `Assistant: ${m.content.trim()}\n\n`;
-    }
-  });
-  prompt += 'Assistant:';
-  return prompt;
-}
-
-function extractGeminiText(parsed) {
-  const parts = parsed?.candidates?.[0]?.content?.parts;
-  if (Array.isArray(parts)) {
-    const text = parts
-      .map((part) => part?.text || '')
-      .join('')
-      .trim();
-    if (text) {
-      return text;
-    }
-  }
-
-  const legacyText =
-    parsed?.candidates?.[0]?.output ||
-    parsed?.output?.text ||
-    parsed?.text ||
-    '';
-
-  return typeof legacyText === 'string' ? legacyText.trim() : '';
+function extractText(parsed) {
+  return parsed?.choices?.[0]?.message?.content || '';
 }
 
 function makeHttpError(message, statusCode) {
@@ -199,39 +163,34 @@ function getClientErrorCode(error) {
   return 'api_error';
 }
 
-// ===================== GEMINI API =====================
+// ===================== OPENROUTER API =====================
 
 /**
- * Single request to Gemini using a specific API key.
+ * Single request to OpenRouter using a specific API key.
  * @param {object[]} messages  - Conversation messages
- * @param {string}   apiKey    - The Gemini API key to use
+ * @param {string}   apiKey    - The OpenRouter API key to use
  * @param {string}   keyLabel  - Safe label for logging (e.g. "Key#2")
  */
-function requestGemini(messages, apiKey, keyLabel, modelOverride) {
+function requestOpenRouter(messages, apiKey, keyLabel, modelOverride) {
   return new Promise((resolve, reject) => {
     const model = modelOverride || MODEL;
-    const prompt = buildGeminiPrompt(messages);
     const body = JSON.stringify({
-      contents: [
-        {
-          parts: [
-            { text: prompt }
-          ]
-        }
-      ],
-      generationConfig: {
-        maxOutputTokens: 1000,
-        temperature: 0.2,
-      },
+      model: model,
+      messages: messages,
+      max_tokens: 1000,
+      temperature: 0.2,
     });
 
     const options = {
-      hostname: 'generativelanguage.googleapis.com',
-      path: `/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`,
+      hostname: 'openrouter.ai',
+      path: '/api/v1/chat/completions',
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`,
         'Content-Length': Buffer.byteLength(body),
+        'HTTP-Referer': 'http://localhost:3000',
+        'X-Title': 'Raijin',
       },
     };
 
@@ -244,25 +203,25 @@ function requestGemini(messages, apiKey, keyLabel, modelOverride) {
         try {
           const parsed = JSON.parse(data || '{}');
           if (res.statusCode >= 200 && res.statusCode < 300) {
-            const text = extractGeminiText(parsed);
+            const text = extractText(parsed);
             if (!text) {
-              console.error('Gemini success response did not contain text:', JSON.stringify(parsed, null, 2));
+              console.error('OpenRouter success response did not contain text:', JSON.stringify(parsed, null, 2));
             }
             console.log(`✓ ${keyLabel} responded successfully (model: ${model}).`);
             resolve({ text, raw: parsed });
           } else {
-            const detail = parsed.error?.message || parsed.message || `Gemini API error ${res.statusCode}`;
+            const detail = parsed.error?.message || parsed.message || `OpenRouter API error ${res.statusCode}`;
             console.error(`✗ ${keyLabel} error (${res.statusCode}):`, detail);
             reject(makeHttpError(detail, res.statusCode));
           }
         } catch (err) {
-          console.error('Gemini raw response:', data);
-          reject(makeHttpError('Failed to parse Gemini response', 502));
+          console.error('OpenRouter raw response:', data);
+          reject(makeHttpError('Failed to parse OpenRouter response', 502));
         }
       });
     });
 
-    req.on('error', (err) => reject(makeHttpError(err.message || 'Network error while contacting Gemini', 502)));
+    req.on('error', (err) => reject(makeHttpError(err.message || 'Network error while contacting OpenRouter', 502)));
     req.write(body);
     req.end();
   });
@@ -278,7 +237,7 @@ function requestGemini(messages, apiKey, keyLabel, modelOverride) {
  *  - If a 503 is returned, retry on the same key (up to MAX_RETRIES).
  *  - If all keys are exhausted, return the 429 error to the client.
  */
-async function proxyGemini(messages) {
+async function proxyOpenRouter(messages) {
   // Try the primary model first, then fallback model.
   const modelsToTry = [MODEL];
   if (FALLBACK_MODEL && FALLBACK_MODEL !== MODEL) {
@@ -308,7 +267,7 @@ async function proxyGemini(messages) {
       // Inner loop: one retry on 503, then rotate key.
       for (let attempt = 1; attempt <= 2; attempt++) {
         try {
-          return await requestGemini(messages, entry.key, entry.label, currentModel);
+          return await requestOpenRouter(messages, entry.key, entry.label, currentModel);
         } catch (error) {
           lastError = error;
 
@@ -365,7 +324,7 @@ function createServer() {
         if (!Array.isArray(messages)) {
           return sendJson(res, 400, {error: 'Invalid request payload: messages must be an array.'});
         }
-        const result = await proxyGemini(messages);
+        const result = await proxyOpenRouter(messages);
         sendJson(res, 200, result);
       } catch (error) {
         console.error('Chat proxy failed:', error);
@@ -394,6 +353,12 @@ function createServer() {
 
   if (req.method === 'GET' && (pathname === '/' || pathname === '/Raijin.html')) {
     return sendFile(res, path.join(PUBLIC_ROOT, 'Raijin.html'), 'text/html');
+  }
+
+  if (req.method === 'GET' && pathname.endsWith('.mp3')) {
+    // Strip leading slash to get the local file path safely (assuming it's in PUBLIC_ROOT)
+    const localFile = pathname.replace(/^\//, '');
+    return sendFile(res, path.join(PUBLIC_ROOT, localFile), 'audio/mpeg');
   }
 
   res.writeHead(404, {'Content-Type': 'text/plain'});

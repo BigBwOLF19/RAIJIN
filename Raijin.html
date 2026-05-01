@@ -2567,6 +2567,214 @@
   </div>
 
   <script>
+    // ===================== RAIJIN SOUND ENGINE =====================
+    const RaijinSFX = (() => {
+      let ctx = null;
+      let masterGain = null;
+      let muted = false;
+      let _unlocked = false;
+      let _bootStartTime = Date.now();
+      let _whirInterval = null;
+      let _swordBuffer = null;
+
+      function loadExternalSounds() {
+        fetch('musicholder-sword-sound-260274.mp3')
+          .then(res => res.arrayBuffer())
+          .then(data => ctx.decodeAudioData(data))
+          .then(buffer => { _swordBuffer = buffer; })
+          .catch(e => console.warn('Could not load musicholder-sword-sound-260274.mp3. Make sure the file is in the same folder.', e));
+      }
+
+      function getCtx() {
+        if (!ctx) {
+          ctx = new (window.AudioContext || window.webkitAudioContext)();
+          masterGain = ctx.createGain();
+          masterGain.gain.value = 0.55;
+          masterGain.connect(ctx.destination);
+          loadExternalSounds();
+        }
+        return ctx;
+      }
+
+      function connect(node) { node.connect(masterGain); }
+
+      function tryUnlock() {
+        if (_unlocked) return;
+        const c = getCtx();
+        if (c.state === 'suspended') {
+          c.resume().then(() => { _unlocked = true; });
+        } else if (c.state === 'running') {
+          _unlocked = true;
+        }
+      }
+
+      ['click', 'mousedown', 'keydown', 'touchstart'].forEach(ev =>
+        document.addEventListener(ev, (e) => {
+          tryUnlock();
+          if (ev === 'click' && (e.target.tagName === 'BUTTON' || e.target.closest('button') || e.target.classList.contains('btn-shard'))) {
+            RaijinSFX.play('tick');
+          }
+        }, { passive: true })
+      );
+
+      function whenReady(fn, delay = 0) {
+        const run = () => {
+          const now = Date.now();
+          const target = _bootStartTime + delay;
+          const wait = Math.max(0, target - now);
+          setTimeout(fn, wait);
+        };
+        if (_unlocked) run();
+        else {
+          const check = setInterval(() => {
+            if (_unlocked) { clearInterval(check); run(); }
+          }, 100);
+        }
+      }
+
+      function osc(type, freq, gainVal, decay, when, endFreq = null) {
+        const c = getCtx();
+        const o = c.createOscillator();
+        const g = c.createGain();
+        o.type = type;
+        o.frequency.setValueAtTime(freq, when);
+        if (endFreq) o.frequency.exponentialRampToValueAtTime(endFreq, when + decay);
+        g.gain.setValueAtTime(gainVal, when);
+        g.gain.exponentialRampToValueAtTime(0.0001, when + decay);
+        o.connect(g); connect(g);
+        o.start(when); o.stop(when + decay + 0.1);
+      }
+
+      function noise(gainVal, duration, when, filterFreq) {
+        const c = getCtx();
+        const bufSize = c.sampleRate * duration;
+        const buf = c.createBuffer(1, bufSize, c.sampleRate);
+        const data = buf.getChannelData(0);
+        for (let i = 0; i < bufSize; i++) data[i] = Math.random() * 2 - 1;
+        const src = c.createBufferSource();
+        src.buffer = buf;
+        const flt = c.createBiquadFilter();
+        flt.type = 'bandpass';
+        flt.frequency.value = filterFreq || 1200;
+        const g = c.createGain();
+        g.gain.setValueAtTime(gainVal, when);
+        g.gain.exponentialRampToValueAtTime(0.0001, when + duration);
+        src.connect(flt); flt.connect(g); connect(g);
+        src.start(when); src.stop(when + duration + 0.1);
+      }
+
+      return {
+        toggle() {
+          muted = !muted;
+          if (masterGain) masterGain.gain.value = muted ? 0 : 0.5;
+          return muted;
+        },
+        play(effect) {
+          if (muted || !_unlocked) return;
+          const c = getCtx();
+          const t = c.currentTime;
+          switch(effect) {
+            case 'zip':
+              osc('sine', 400, 0.1, 0.15, t, 1600);
+              noise(0.04, 0.1, t, 2500);
+              break;
+            case 'summon':
+              osc('sawtooth', 60, 0.3, 1.2, t, 15);
+              noise(0.4, 1.5, t, 250, 'lowpass');
+              osc('square', 300, 0.15, 0.3, t + 0.1, 900);
+              break;
+            case 'spark':
+              osc('square', 1400, 0.08, 0.1, t, 2200);
+              noise(0.06, 0.08, t, 4500);
+              break;
+            case 'tick':
+              osc('square', 2400, 0.03, 0.04, t, 2400);
+              break;
+            case 'slash':
+              if (_swordBuffer) {
+                const src = c.createBufferSource();
+                src.buffer = _swordBuffer;
+                const g = c.createGain();
+                g.gain.value = 0.85;
+                src.connect(g);
+                connect(g);
+                src.start(t);
+              } else {
+                // Procedural fallback
+                osc('triangle', 3200, 0.1, 0.1, t, 800);
+                osc('square', 1800, 0.08, 0.15, t, 400);
+                noise(0.2, 0.12, t, 4500);
+              }
+              break;
+          }
+        },
+        bootStart() {
+          if (muted) return;
+          _bootStartTime = Date.now();
+          whenReady(() => {
+            const c = getCtx();
+            const t = c.currentTime;
+            osc('sine', 55, 0.12, 2.5, t);
+            let wc = 0;
+            _whirInterval = setInterval(() => {
+              if (_unlocked && !muted) {
+                const ct = getCtx().currentTime;
+                osc('square', 180 + Math.random() * 40, 0.04, 0.12, ct, 140);
+                noise(0.02, 0.08, ct, 2500);
+                if (wc % 3 === 0) osc('sawtooth', 90, 0.06, 0.25, ct, 150);
+                wc++;
+              }
+            }, 180);
+          });
+        },
+        bootBeep(i) {
+          if (muted) return;
+          whenReady(() => {
+            const c = getCtx();
+            const t = c.currentTime;
+            const f = [880, 1040, 960, 1100, 1320][i % 5];
+            osc('square', f, 0.08, 0.12, t, f * 1.2);
+            noise(0.02, 0.05, t, 3000);
+          }, 650 + i * 310);
+        },
+        bootComplete() {
+          if (muted) return;
+          clearInterval(_whirInterval);
+          whenReady(() => {
+            const c = getCtx();
+            const t = c.currentTime;
+            osc('sawtooth', 110, 0.2, 0.6, t, 2400);
+            osc('sine', 220, 0.15, 0.6, t, 4800);
+            noise(0.3, 1.2, t + 0.2, 300, 'lowpass');
+          }, 2700);
+        }
+      };
+    })();
+
+    // Mute toggle with M key — shows a quick toast
+    document.addEventListener('keydown', e => {
+      if (e.key === 'm' || e.key === 'M') {
+        const isMuted = RaijinSFX.toggle();
+        const toast = document.createElement('div');
+        toast.textContent = isMuted ? '🔇 Sound OFF' : '🔊 Sound ON';
+        Object.assign(toast.style, {
+          position: 'fixed', bottom: '5rem', left: '50%',
+          transform: 'translateX(-50%)',
+          background: 'rgba(13,10,26,0.9)',
+          border: '1px solid rgba(108,63,255,0.5)',
+          color: 'var(--purple-bright)',
+          fontFamily: "'Share Tech Mono', monospace",
+          fontSize: '0.8rem', letterSpacing: '0.1em',
+          padding: '0.45rem 1rem', borderRadius: '4px',
+          zIndex: '99999', pointerEvents: 'none',
+          transition: 'opacity 0.4s'
+        });
+        document.body.appendChild(toast);
+        setTimeout(() => { toast.style.opacity = '0'; }, 1200);
+        setTimeout(() => toast.remove(), 1700);
+      }
+    });
+
     // The browser sends chat requests to the local proxy server.
     // Run server.js with ANTHROPIC_API_KEY set in the server environment.
 
@@ -2865,6 +3073,7 @@
       if (target) target.classList.add('active');
 
       setBackgroundState(screenId);
+      RaijinSFX.play('zip');
 
       if (screenId === 'chat') {
         setTimeout(() => chatInput.focus(), 600);
@@ -2972,6 +3181,16 @@
       chatUnlocked = true;
       riddleOverlay.classList.add('shatter');
       riddleInput.blur();
+      
+      RaijinSFX.play('slash');
+      setTimeout(() => RaijinSFX.play('slash'), 150);
+      setTimeout(() => RaijinSFX.play('slash'), 320);
+      setTimeout(() => RaijinSFX.play('slash'), 550);
+      setTimeout(() => {
+        RaijinSFX.play('spark');
+        RaijinSFX.play('slash');
+      }, 800);
+
       setTimeout(() => {
         closeRiddle();
         beginSummoning();
@@ -2989,6 +3208,7 @@
       fgCtx.clearRect(0, 0, W, H);
       stormIntensity = 0.55;
       for (let i = 0; i < 3; i++) setTimeout(() => makeScreenBolt('summon'), i * 120);
+      RaijinSFX.play('summon');
       setTimeout(() => {
         revealChat();
       }, 260);
@@ -3180,7 +3400,10 @@
       refreshStatsUI();
       saveChat();
 
-      if (gained > 0) showXPNotif(`+${gained} XP EARNED`);
+      if (gained > 0) {
+        showXPNotif(`+${gained} XP EARNED`);
+        RaijinSFX.play('spark');
+      }
       if (level > oldLevel) setTimeout(() => showLevelUp(level), 800);
     }
 
@@ -3285,34 +3508,11 @@ Your goal is to feel like a distinctive AI with storm-born attitude and real con
       chatMessages.appendChild(div);
       chatMessages.scrollTop = chatMessages.scrollHeight;
 
-      // Show the cinematic loader
-      const loader = document.getElementById('ai-loader');
-      const statusEl = document.getElementById('loader-status-text');
-      if (loader) loader.classList.add('active');
-      // Cycle through dramatic status phrases
-      let phraseIdx = 0;
-      function cyclePhrase() {
-        if (statusEl) {
-          phraseIdx = (phraseIdx + 1) % AI_LOADER_PHRASES.length;
-          const p = AI_LOADER_PHRASES[phraseIdx];
-          statusEl.textContent = p;
-          statusEl.setAttribute('data-text', p);
-        }
-        _loaderPhraseTimer = setTimeout(cyclePhrase, 900 + Math.random() * 600);
-      }
-      _loaderPhraseTimer = setTimeout(cyclePhrase, 900);
     }
     function removeTyping() {
       const el = document.getElementById('typing-msg');
       if (el) el.remove();
-
-      // Hide the cinematic loader
-      const loader = document.getElementById('ai-loader');
-      if (loader) loader.classList.remove('active');
       clearTimeout(_loaderPhraseTimer);
-      // Reset phrase
-      const statusEl = document.getElementById('loader-status-text');
-      if (statusEl) { statusEl.textContent = 'PROCESSING...'; statusEl.setAttribute('data-text', 'PROCESSING...'); }
     }
 
     // Typewriter stream into a bubble element
@@ -3621,6 +3821,9 @@ Your goal is to feel like a distinctive AI with storm-born attitude and real con
         }, 220);
       }
 
+      // ---- Start boot sounds ----
+      RaijinSFX.bootStart();
+
       // Reveal eyebrow + first word after a brief pause
       setTimeout(() => { if (eyebrow) eyebrow.classList.add('vis'); }, 150);
       setTimeout(() => {
@@ -3631,12 +3834,13 @@ Your goal is to feel like a distinctive AI with storm-born attitude and real con
       // Stop cycling ~200ms before flash so last word stays visible
       setTimeout(() => clearInterval(wordTimer), 2500);
 
-      // Reveal terminal lines sequentially
+      // Reveal terminal lines sequentially — beep on each
       const lineIds = ['bl0','bl1','bl2','bl3','bl4'];
       lineIds.forEach((id, i) => {
         setTimeout(() => {
           const el = document.getElementById(id);
           if (el) el.classList.add('vis');
+          RaijinSFX.bootBeep(i);
         }, 650 + i * 310);
       });
 
@@ -3662,6 +3866,8 @@ Your goal is to feel like a distinctive AI with storm-born attitude and real con
         // Snap bar to 100%
         if (bar) bar.style.width = '100%';
         if (pctEl) pctEl.textContent = '100%';
+        // Power-up sound fires just before the flash
+        RaijinSFX.bootComplete();
         // White flash
         setTimeout(() => {
           if (flashEl) flashEl.style.opacity = '1';
