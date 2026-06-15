@@ -10,6 +10,8 @@ const DEFAULT_PORT = Number(process.env.PORT) || 3000;
 const MODEL = process.env.OPENROUTER_MODEL || 'google/gemini-2.5-flash';
 const FALLBACK_MODEL = process.env.OPENROUTER_FALLBACK_MODEL || 'google/gemini-2.0-flash-exp';
 const PUBLIC_ROOT = __dirname;
+const MEMORY_DIR = path.join(__dirname, 'memory');
+const MEMORY_FILE = path.join(MEMORY_DIR, 'raijin-memory.json');
 const MAX_RETRIES = 3;
 const DEFAULT_COOLDOWN_MS = (Number(process.env.KEY_COOLDOWN_SECONDS) || 60) * 1000;
 
@@ -31,6 +33,13 @@ class KeyPool {
     }));
     this.defaultCooldownMs = defaultCooldownMs;
     this.nextIndex = 0;
+
+    // Validation: Warn if key doesn't look like an OpenRouter key
+    this.keys.forEach(k => {
+      if (!k.key.startsWith('sk-or-v1-')) {
+        console.warn(`⚠️  Warning: ${k.label} does not start with 'sk-or-v1-'. Ensure it is a valid OpenRouter key.`);
+      }
+    });
   }
 
   /**
@@ -145,6 +154,110 @@ function sendFile(res, filePath, contentType) {
   });
 }
 
+function readRequestJson(req, maxBytes = 1024 * 1024) {
+  return new Promise((resolve, reject) => {
+    let body = '';
+    req.on('data', (chunk) => {
+      body += chunk;
+      if (Buffer.byteLength(body) > maxBytes) {
+        req.destroy();
+        reject(makeHttpError('Request body too large', 413));
+      }
+    });
+    req.on('end', () => {
+      try {
+        resolve(JSON.parse(body || '{}'));
+      } catch {
+        reject(makeHttpError('Invalid JSON payload', 400));
+      }
+    });
+    req.on('error', reject);
+  });
+}
+
+function defaultMemoryState() {
+  return {
+    version: 1,
+    updatedAt: null,
+    stats: { xp: 0, level: 1, messages: 0 },
+    history: [],
+    learning: {
+      version: 1,
+      feedback: {},
+      rewards: 0,
+      penalties: 0,
+      style: {
+        concise: 0,
+        detailed: 0,
+        casual: 0,
+        direct: 0,
+        warmer: 0,
+      },
+      memories: [],
+      corrections: [],
+      updatedAt: null,
+    },
+  };
+}
+
+function ensureMemoryDir() {
+  fs.mkdirSync(MEMORY_DIR, { recursive: true });
+}
+
+function normalizeServerMemory(payload) {
+  const base = defaultMemoryState();
+  const source = payload && typeof payload === 'object' ? payload : {};
+  const learning = source.learning && typeof source.learning === 'object' ? source.learning : {};
+  const stats = source.stats && typeof source.stats === 'object' ? source.stats : {};
+
+  return {
+    ...base,
+    ...source,
+    version: 1,
+    updatedAt: source.updatedAt || null,
+    stats: {
+      xp: Number(stats.xp) || 0,
+      level: Number(stats.level) || 1,
+      messages: Number(stats.messages) || 0,
+    },
+    history: Array.isArray(source.history) ? source.history.slice(-120) : [],
+    learning: {
+      ...base.learning,
+      ...learning,
+      feedback: learning.feedback && typeof learning.feedback === 'object' ? learning.feedback : {},
+      style: { ...base.learning.style, ...(learning.style || {}) },
+      memories: Array.isArray(learning.memories) ? learning.memories.slice(0, 50) : [],
+      corrections: Array.isArray(learning.corrections) ? learning.corrections.slice(0, 40) : [],
+    },
+  };
+}
+
+function readMemoryState() {
+  ensureMemoryDir();
+  if (!fs.existsSync(MEMORY_FILE)) {
+    const initial = defaultMemoryState();
+    fs.writeFileSync(MEMORY_FILE, JSON.stringify(initial, null, 2));
+    return initial;
+  }
+  try {
+    const parsed = JSON.parse(fs.readFileSync(MEMORY_FILE, 'utf8') || '{}');
+    return normalizeServerMemory(parsed);
+  } catch (error) {
+    console.warn('Failed to read memory file. Starting with a blank memory state:', error.message);
+    return defaultMemoryState();
+  }
+}
+
+function writeMemoryState(payload) {
+  ensureMemoryDir();
+  const next = normalizeServerMemory({
+    ...payload,
+    updatedAt: new Date().toISOString(),
+  });
+  fs.writeFileSync(MEMORY_FILE, JSON.stringify(next, null, 2));
+  return next;
+}
+
 function extractText(parsed) {
   return parsed?.choices?.[0]?.message?.content || '';
 }
@@ -159,6 +272,7 @@ function getClientErrorCode(error) {
   if (error.statusCode === 429) return 'quota_exceeded';
   if (error.statusCode === 503) return 'overloaded';
   if (error.statusCode === 401 || error.statusCode === 403) return 'auth_failed';
+  if (error.statusCode === 402) return 'insufficient_credits';
   if (error.statusCode === 502) return 'network_error';
   return 'api_error';
 }
@@ -315,11 +429,9 @@ function createServer() {
   const pathname = requestUrl.pathname;
 
   if (req.method === 'POST' && pathname === '/api/chat') {
-    let body = '';
-    req.on('data', (chunk) => { body += chunk; });
-    req.on('end', async () => {
+    readRequestJson(req)
+      .then(async (payload) => {
       try {
-        const payload = JSON.parse(body || '{}');
         const messages = payload.messages;
         if (!Array.isArray(messages)) {
           return sendJson(res, 400, {error: 'Invalid request payload: messages must be an array.'});
@@ -336,7 +448,49 @@ function createServer() {
           },
         });
       }
-    });
+    })
+      .catch((error) => {
+        const statusCode = error.statusCode || 500;
+        sendJson(res, statusCode, {
+          error: {
+            code: getClientErrorCode(error),
+            message: error.message || 'Unknown error',
+          },
+        });
+      });
+    return;
+  }
+
+  if (req.method === 'GET' && pathname === '/api/memory') {
+    try {
+      return sendJson(res, 200, readMemoryState());
+    } catch (error) {
+      console.error('Memory read failed:', error);
+      return sendJson(res, 500, {
+        error: {
+          code: 'memory_read_failed',
+          message: error.message || 'Failed to read memory',
+        },
+      });
+    }
+  }
+
+  if (req.method === 'POST' && pathname === '/api/memory') {
+    readRequestJson(req, 2 * 1024 * 1024)
+      .then((payload) => {
+        const next = writeMemoryState(payload);
+        sendJson(res, 200, next);
+      })
+      .catch((error) => {
+        console.error('Memory write failed:', error);
+        const statusCode = error.statusCode || 500;
+        sendJson(res, statusCode, {
+          error: {
+            code: 'memory_write_failed',
+            message: error.message || 'Failed to write memory',
+          },
+        });
+      });
     return;
   }
 

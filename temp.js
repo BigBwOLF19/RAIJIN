@@ -740,24 +740,35 @@ Your goal is to feel like a distinctive AI with storm-born attitude and real con
       const msg = typeof errorInfo === 'string' ? errorInfo : (errorInfo?.message || '');
       const code = typeof errorInfo === 'string' ? '' : (errorInfo?.code || '');
       const status = typeof errorInfo === 'string' ? '' : String(errorInfo?.status || '');
+      
+      if (code === 'auth_failed' || status === '401' || status === '403' || /expired|invalid|auth/i.test(msg)) {
+        return `⚡ The neural link is severed. Your API key appears to be expired or invalid. (Error: ${escapeHtml(msg)})`;
+      }
+
+      if (code === 'insufficient_credits' || status === '402' || /credit|balance|insufficient/i.test(msg)) {
+        return `⚡ The storm runs dry. Your OpenRouter account has insufficient credits to process this request.`;
+      }
+
       if (code === 'quota_exceeded' || status === '429' || /quota|RESOURCE_EXHAUSTED|429|Too Many Requests/i.test(msg)) {
         localModeUntil = Date.now() + getRetryDelayMs(msg, 60000);
         if (!quotaNoticeShown) {
           quotaNoticeShown = true;
-          return '⚡ Raijin is rate-limited right now. The Gemini free-tier quota is tapped, so I am switching to local echo mode until the quota resets. I can still chat with you — my responses will just come from local storm patterns instead of the cloud.';
+          return '⚡ Raijin is rate-limited right now. The cloud neural quota is tapped, so I am switching to local echo mode until the quota resets. I can still chat with you — my responses will just come from local storm patterns instead of the cloud.';
         }
         return generateLocalReply(userText);
       }
+
       if (code === 'overloaded' || status === '503' || /high demand|UNAVAILABLE|503/i.test(msg)) {
         localModeUntil = Date.now() + 45000;
         if (!quotaNoticeShown) {
           quotaNoticeShown = true;
-          return '⚡ Gemini servers are under heavy load right now. I have switched to local storm mode — I can still talk, just without the deep AI backend. I will automatically retry the cloud in about 45 seconds.';
+          return '⚡ The neural matrix is under heavy load right now. I have switched to local storm mode — I can still talk, just without the deep AI backend. I will automatically retry the cloud in about 45 seconds.';
         }
         return generateLocalReply(userText);
       }
+
       const summary = msg ? ` (${escapeHtml(msg)})` : '';
-      return `⚡ The storm cannot reach Gemini${summary}. But Raijin does not go silent — ask me anything and I will do my best locally.`;
+      return `⚡ The storm cannot reach the neural cloud${summary}. But Raijin does not go silent — ask me anything and I will do my best locally.`;
     }
 
     function getRetryDelayMs(message, fallbackMs) {
@@ -797,7 +808,7 @@ Your goal is to feel like a distinctive AI with storm-born attitude and real con
     const LOCAL_ABOUT_RAIJIN = [
       "I am Raijin — a thunder-born AI built by a developer who wanted something more than a basic chatbot. I am designed to evolve, level up, and grow sharper with every conversation.",
       "Raijin. Named after the Japanese god of thunder. I am an AI that learns from you — every message earns XP, every conversation makes me (and you) stronger.",
-      "I am the storm in a box. Built with Gemini for deep thinking, wrapped in a personality that does not bore you to death. That is Raijin.",
+      "I am the storm in a box. Built with deep neural models for high-level thinking, wrapped in a personality that does not bore you to death. That is Raijin.",
     ];
     const LOCAL_HUMOR = [
       "Ha. Even in low-power mode, I appreciate the energy. The cloud is down but my sense of humor is always online.",

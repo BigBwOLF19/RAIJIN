@@ -814,9 +814,9 @@
       margin-left: auto;
       font-family: 'Share Tech Mono', monospace;
       font-size: 0.7rem;
-      color: var(--gold);
-      background: rgba(251, 191, 36, 0.1);
-      border: 1px solid rgba(251, 191, 36, 0.3);
+      color: var(--cyan-accent);
+      background: rgba(103, 232, 249, 0.08);
+      border: 1px solid rgba(103, 232, 249, 0.26);
       padding: 0.25rem 0.75rem;
       border-radius: 20px;
     }
@@ -908,6 +908,64 @@
 
     .msg.user .msg-time {
       text-align: right;
+    }
+
+    .msg-actions {
+      display: flex;
+      gap: 0.4rem;
+      margin-top: 0.45rem;
+      padding: 0 0.25rem;
+      opacity: 0.72;
+      transition: opacity 0.2s ease;
+    }
+
+    .msg.ai:hover .msg-actions {
+      opacity: 1;
+    }
+
+    .feedback-btn {
+      min-width: 28px;
+      height: 24px;
+      padding: 0 0.5rem;
+      border: 1px solid rgba(103, 232, 249, 0.22);
+      border-radius: 6px;
+      background: rgba(17, 17, 24, 0.72);
+      color: var(--grey-200);
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 0.68rem;
+      cursor: pointer;
+      transition: border-color 0.2s ease, color 0.2s ease, transform 0.2s ease;
+    }
+
+    .feedback-btn:hover {
+      border-color: var(--cyan-accent);
+      color: var(--cyan-accent);
+      transform: translateY(-1px);
+    }
+
+    .feedback-btn.selected {
+      border-color: var(--success);
+      color: var(--success);
+      box-shadow: 0 0 12px rgba(52, 211, 153, 0.18);
+    }
+
+    .learning-status {
+      padding: 0.65rem 1.5rem;
+      border-top: 1px solid rgba(108, 63, 255, 0.16);
+      display: flex;
+      justify-content: space-between;
+      gap: 1rem;
+      align-items: center;
+      background: rgba(13, 10, 26, 0.42);
+      color: var(--grey-400);
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 0.68rem;
+      letter-spacing: 0.04em;
+    }
+
+    .learning-status strong {
+      color: var(--cyan-accent);
+      font-weight: 400;
     }
 
     .typing-indicator {
@@ -2232,7 +2290,7 @@
       <div class="boot-ring-inner"></div>
       <div class="boot-core">
         <svg class="boot-bolt-svg" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M13 2L4.5 13.5H11L10 22L19.5 10.5H13L13 2Z"
+          <polygon points="13,2 4.5,13.5 11,13.5 10,22 19.5,10.5 13,10.5"
             fill="url(#bootBoltGrad)" stroke="rgba(103,232,249,0.85)" stroke-width="0.6" stroke-linejoin="round"/>
           <defs>
             <linearGradient id="bootBoltGrad" x1="12" y1="2" x2="12" y2="22" gradientUnits="userSpaceOnUse">
@@ -2359,7 +2417,7 @@
         <div class="loader-arc"></div>
         <!-- Bolt SVG -->
         <svg class="loader-bolt-svg" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M13 2L4.5 13.5H11L10 22L19.5 10.5H13L13 2Z"
+          <polygon points="13,2 4.5,13.5 11,13.5 10,22 19.5,10.5 13,10.5"
             fill="url(#boltGrad)" stroke="rgba(103,232,249,0.9)" stroke-width="0.6"
             stroke-linejoin="round"/>
           <defs>
@@ -2485,13 +2543,18 @@
             </div>
           </div>
 
+          <div class="learning-status" id="learning-status">
+            <span>LEARNING: <strong>0</strong> signals</span>
+            <span>LOCAL MEMORY ACTIVE</span>
+          </div>
+
           <div class="chat-input-area">
             <textarea class="chat-textarea" id="chat-input" placeholder="Ask Raijin anything..." rows="1"
               data-gramm="false" data-gramm_editor="false" data-enable-grammarly="false" spellcheck="false"
               onkeydown="handleKey(event)" oninput="autoResize(this)"></textarea>
             <button class="send-btn" id="send-btn" onclick="sendMessage()">
               <svg viewBox="0 0 24 24">
-                <path d="M2 21l21-9L2 3v7l15 2-15 2v7z" />
+                <polygon points="2,21 23,12 2,3 2,10 17,12 2,14" />
               </svg>
             </button>
           </div>
@@ -2575,6 +2638,7 @@
       let _unlocked = false;
       let _bootStartTime = Date.now();
       let _whirInterval = null;
+      let _themeInterval = null;
       let _swordBuffer = null;
 
       function loadExternalSounds() {
@@ -2714,17 +2778,68 @@
           whenReady(() => {
             const c = getCtx();
             const t = c.currentTime;
-            osc('sine', 55, 0.12, 2.5, t);
+            
+            // Low drone
+            osc('sine', 55, 0.15, 4.0, t);
+            
+            // Stranger Things Arpeggio: C2, E2, G2, B2, C3, B2, G2, E2
+            const notes = [65.41, 82.41, 98.00, 123.47, 130.81, 123.47, 98.00, 82.41];
+            let step = 0;
+            
+            _themeInterval = setInterval(() => {
+              if (muted || !_unlocked) return;
+              const ct = getCtx().currentTime;
+              const freq = notes[step % notes.length];
+              
+              // Synth Layer
+              const o = getCtx().createOscillator();
+              const g = getCtx().createGain();
+              const f = getCtx().createBiquadFilter();
+              
+              o.type = 'sawtooth';
+              o.frequency.setValueAtTime(freq, ct);
+              
+              f.type = 'lowpass';
+              f.frequency.setValueAtTime(300 + Math.sin(ct * 2) * 100, ct);
+              f.Q.value = 5;
+              
+              g.gain.setValueAtTime(0.08, ct);
+              g.gain.exponentialRampToValueAtTime(0.0001, ct + 0.35);
+              
+              o.connect(f);
+              f.connect(g);
+              g.connect(masterGain);
+              
+              o.start(ct);
+              o.stop(ct + 0.4);
+              
+              // Sub layer
+              if (step % 8 === 0) {
+                const sub = getCtx().createOscillator();
+                const subG = getCtx().createGain();
+                sub.type = 'sine';
+                sub.frequency.setValueAtTime(freq / 2, ct);
+                subG.gain.setValueAtTime(0.12, ct);
+                subG.gain.exponentialRampToValueAtTime(0.0001, ct + 0.8);
+                sub.connect(subG);
+                subG.connect(masterGain);
+                sub.start(ct);
+                sub.stop(ct + 0.9);
+              }
+              
+              step++;
+            }, 145);
+            
+            // Original boot blips for the text
             let wc = 0;
             _whirInterval = setInterval(() => {
               if (_unlocked && !muted) {
                 const ct = getCtx().currentTime;
-                osc('square', 180 + Math.random() * 40, 0.04, 0.12, ct, 140);
-                noise(0.02, 0.08, ct, 2500);
-                if (wc % 3 === 0) osc('sawtooth', 90, 0.06, 0.25, ct, 150);
+                // Subtle mechanical whir kept at lower volume
+                osc('square', 180 + Math.random() * 20, 0.02, 0.08, ct, 140);
                 wc++;
               }
-            }, 180);
+            }, 200);
           });
         },
         bootBeep(i) {
@@ -2740,6 +2855,7 @@
         bootComplete() {
           if (muted) return;
           clearInterval(_whirInterval);
+          clearInterval(_themeInterval);
           whenReady(() => {
             const c = getCtx();
             const t = c.currentTime;
@@ -2751,9 +2867,9 @@
       };
     })();
 
-    // Mute toggle with M key — shows a quick toast
+    // Mute toggle shortcut shows a quick toast
     document.addEventListener('keydown', e => {
-      if (e.key === 'm' || e.key === 'M') {
+      if (e.key.toLowerCase() === 'm') {
         const isMuted = RaijinSFX.toggle();
         const toast = document.createElement('div');
         toast.textContent = isMuted ? '🔇 Sound OFF' : '🔊 Sound ON';
@@ -3366,28 +3482,119 @@
     function saveChat() {
       localStorage.setItem('raijin_history', JSON.stringify(conversationHistory));
       localStorage.setItem('raijin_stats', JSON.stringify({ xp, level, messages }));
+      localStorage.setItem('raijin_learning', JSON.stringify(learningModel));
+      saveServerMemorySoon();
     }
 
-    function loadChat() {
+    function getMemorySnapshot() {
+      return {
+        version: 1,
+        updatedAt: new Date().toISOString(),
+        stats: { xp, level, messages },
+        history: conversationHistory.slice(-120),
+        learning: normalizeLearningModel(learningModel)
+      };
+    }
+
+    function applyMemoryState(memory) {
+      if (!memory || typeof memory !== 'object') return;
+      const stats = memory.stats || {};
+      xp = stats.xp || 0;
+      level = stats.level || 1;
+      messages = stats.messages || 0;
+      conversationHistory = Array.isArray(memory.history) ? memory.history : [];
+      learningModel = normalizeLearningModel(memory.learning);
+
+      localStorage.setItem('raijin_history', JSON.stringify(conversationHistory));
+      localStorage.setItem('raijin_stats', JSON.stringify({ xp, level, messages }));
+      localStorage.setItem('raijin_learning', JSON.stringify(learningModel));
+
+      refreshStatsUI();
+      refreshLearningUI();
+      renderConversationHistory();
+    }
+
+    function renderConversationHistory() {
+      chatMessages.innerHTML = '';
+      if (!conversationHistory.length) return;
+      conversationHistory.forEach((msg, index) => {
+        addMessage(msg.role === 'user' ? 'user' : 'ai', msg.content, msg.role === 'assistant' ? index : null);
+      });
+    }
+
+    function saveServerMemorySoon() {
+      clearTimeout(memorySaveTimer);
+      memorySaveTimer = setTimeout(() => {
+        saveServerMemoryNow();
+      }, 350);
+    }
+
+    async function saveServerMemoryNow() {
+      try {
+        const response = await fetch('/api/memory', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(getMemorySnapshot())
+        });
+        if (!response.ok) throw new Error(`Memory API returned ${response.status}`);
+      } catch (error) {
+        console.warn('Could not save server memory; browser cache still has the latest state.', error);
+      }
+    }
+
+    async function loadChat() {
       const savedStats = localStorage.getItem('raijin_stats');
       if (savedStats) {
-        const stats = JSON.parse(savedStats);
-        xp = stats.xp || 0;
-        level = stats.level || 1;
-        messages = stats.messages || 0;
+        try {
+          const stats = JSON.parse(savedStats);
+          xp = stats.xp || 0;
+          level = stats.level || 1;
+          messages = stats.messages || 0;
+        } catch {}
       }
       refreshStatsUI();
 
+      const savedLearning = localStorage.getItem('raijin_learning');
+      if (savedLearning) {
+        try {
+          learningModel = normalizeLearningModel(JSON.parse(savedLearning));
+        } catch {
+          learningModel = createDefaultLearningModel();
+        }
+      }
+      refreshLearningUI();
+
       const savedHistory = localStorage.getItem('raijin_history');
       if (savedHistory) {
-        const history = JSON.parse(savedHistory);
-        if (history.length > 0) {
-          conversationHistory = history;
-          chatMessages.innerHTML = '';
-          conversationHistory.forEach(msg => {
-            addMessage(msg.role === 'user' ? 'user' : 'ai', msg.content);
-          });
+        try {
+          const history = JSON.parse(savedHistory);
+          if (history.length > 0) {
+            conversationHistory = history;
+            renderConversationHistory();
+          }
+        } catch {}
+      }
+
+      try {
+        const response = await fetch('/api/memory');
+        if (!response.ok) throw new Error(`Memory API returned ${response.status}`);
+        const memory = await response.json();
+        const serverHasData =
+          memory.updatedAt ||
+          memory.history?.length ||
+          memory.learning?.memories?.length ||
+          memory.learning?.corrections?.length ||
+          memory.learning?.rewards ||
+          memory.learning?.penalties ||
+          memory.stats?.messages;
+
+        if (serverHasData) {
+          applyMemoryState(memory);
+        } else {
+          await saveServerMemoryNow();
         }
+      } catch (error) {
+        console.warn('Server memory unavailable; using browser cache only.', error);
       }
     }
 
@@ -3460,8 +3667,11 @@ Your goal is to feel like a distinctive AI with storm-born attitude and real con
     const chatMessages = document.getElementById('chat-messages');
     const chatInput = document.getElementById('chat-input');
     const sendBtn = document.getElementById('send-btn');
+    const learningStatus = document.getElementById('learning-status');
     let isLoading = false;
     let conversationHistory = [];
+    let learningModel = createDefaultLearningModel();
+    let memorySaveTimer = null;
     const USE_LOCAL_FALLBACK = true; // keeps chat alive when the browser cannot call the API directly
     let localModeUntil = 0;
     let quotaNoticeShown = false;
@@ -3470,7 +3680,59 @@ Your goal is to feel like a distinctive AI with storm-born attitude and real con
       return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     }
 
-    function addMessage(role, content) {
+    function createDefaultLearningModel() {
+      return {
+        version: 1,
+        feedback: {},
+        rewards: 0,
+        penalties: 0,
+        style: {
+          concise: 0,
+          detailed: 0,
+          casual: 0,
+          direct: 0,
+          warmer: 0
+        },
+        memories: [],
+        corrections: [],
+        updatedAt: null
+      };
+    }
+
+    function normalizeLearningModel(model) {
+      const base = createDefaultLearningModel();
+      if (!model || typeof model !== 'object') return base;
+      return {
+        ...base,
+        ...model,
+        feedback: model.feedback && typeof model.feedback === 'object' ? model.feedback : {},
+        style: { ...base.style, ...(model.style || {}) },
+        memories: Array.isArray(model.memories) ? model.memories.slice(0, 18) : [],
+        corrections: Array.isArray(model.corrections) ? model.corrections.slice(0, 12) : []
+      };
+    }
+
+    function saveLearning() {
+      learningModel.updatedAt = new Date().toISOString();
+      localStorage.setItem('raijin_learning', JSON.stringify(learningModel));
+      refreshLearningUI();
+      saveServerMemorySoon();
+    }
+
+    function refreshLearningUI() {
+      if (!learningStatus) return;
+      const signalCount =
+        learningModel.rewards +
+        learningModel.penalties +
+        learningModel.memories.length +
+        learningModel.corrections.length;
+      learningStatus.innerHTML = `
+        <span>LEARNING: <strong>${signalCount}</strong> signals</span>
+        <span>${learningModel.memories.length} memories / ${learningModel.corrections.length} corrections</span>
+      `;
+    }
+
+    function addMessage(role, content, messageIndex = null) {
       const div = document.createElement('div');
       div.className = `msg ${role === 'user' ? 'user' : 'ai'}`;
       div.innerHTML = `
@@ -3478,13 +3740,90 @@ Your goal is to feel like a distinctive AI with storm-born attitude and real con
     <div>
       <div class="msg-bubble"></div>
       <div class="msg-time">${getTime()}</div>
+      ${role === 'ai' && Number.isInteger(messageIndex) ? `
+        <div class="msg-actions" data-message-index="${messageIndex}">
+          <button class="feedback-btn" type="button" onclick="rewardReply(${messageIndex}, 1, this)">GOOD</button>
+          <button class="feedback-btn" type="button" onclick="rewardReply(${messageIndex}, -1, this)">BAD</button>
+          <button class="feedback-btn" type="button" onclick="correctReply(${messageIndex})">TEACH</button>
+        </div>
+      ` : ''}
     </div>
   `;
       chatMessages.appendChild(div);
       const bubble = div.querySelector('.msg-bubble');
       if (content) bubble.innerHTML = content;
+      syncFeedbackButtons(div, messageIndex);
       chatMessages.scrollTop = chatMessages.scrollHeight;
       return bubble;
+    }
+
+    function syncFeedbackButtons(scope, messageIndex) {
+      if (!Number.isInteger(messageIndex)) return;
+      const feedback = learningModel.feedback[String(messageIndex)];
+      if (!feedback) return;
+      const buttons = scope.querySelectorAll('.feedback-btn');
+      buttons.forEach(btn => {
+        if ((feedback.score > 0 && btn.textContent === 'GOOD') || (feedback.score < 0 && btn.textContent === 'BAD')) {
+          btn.classList.add('selected');
+        }
+      });
+    }
+
+    function rewardReply(messageIndex, score, button) {
+      const msg = conversationHistory[messageIndex];
+      if (!msg || msg.role !== 'assistant') return;
+      const key = String(messageIndex);
+      const previous = learningModel.feedback[key]?.score || 0;
+      if (previous > 0) learningModel.rewards = Math.max(0, learningModel.rewards - 1);
+      if (previous < 0) learningModel.penalties = Math.max(0, learningModel.penalties - 1);
+      learningModel.feedback[key] = {
+        score,
+        assistant: msg.content.slice(0, 500),
+        userBefore: findPreviousUserMessage(messageIndex),
+        at: new Date().toISOString()
+      };
+      if (score > 0) learningModel.rewards++;
+      if (score < 0) learningModel.penalties++;
+      tuneStyleFromFeedback(score, learningModel.feedback[key].userBefore, msg.content);
+      saveLearning();
+      if (button) {
+        const group = button.closest('.msg-actions');
+        group?.querySelectorAll('.feedback-btn').forEach(btn => btn.classList.remove('selected'));
+        button.classList.add('selected');
+      }
+    }
+
+    function correctReply(messageIndex) {
+      const msg = conversationHistory[messageIndex];
+      if (!msg || msg.role !== 'assistant') return;
+      const correction = prompt('Teach Raijin what to do better next time:');
+      if (!correction || !correction.trim()) return;
+      learningModel.corrections.unshift({
+        instruction: correction.trim().slice(0, 500),
+        userBefore: findPreviousUserMessage(messageIndex),
+        assistant: msg.content.slice(0, 500),
+        at: new Date().toISOString()
+      });
+      learningModel.corrections = learningModel.corrections.slice(0, 12);
+      rewardReply(messageIndex, -1);
+      saveLearning();
+    }
+
+    function findPreviousUserMessage(messageIndex) {
+      for (let i = messageIndex - 1; i >= 0; i--) {
+        if (conversationHistory[i]?.role === 'user') return conversationHistory[i].content.slice(0, 500);
+      }
+      return '';
+    }
+
+    function tuneStyleFromFeedback(score, userText, assistantText) {
+      const combined = `${userText || ''} ${assistantText || ''}`.toLowerCase();
+      const amount = score > 0 ? 1 : -1;
+      if (assistantText.length < 360) learningModel.style.concise += amount;
+      if (assistantText.length > 700) learningModel.style.detailed += amount;
+      if (/\b(lol|haha|joke|funny|vibe|bro|yo)\b/.test(combined)) learningModel.style.casual += amount;
+      if (/\b(code|bug|fix|error|api|server|html|css|javascript|node)\b/.test(combined)) learningModel.style.direct += amount;
+      if (/\b(feel|sad|happy|worried|stress|friend|talk)\b/.test(combined)) learningModel.style.warmer += amount;
     }
 
     // Typewriter stream into a bubble element
@@ -3548,6 +3887,85 @@ Your goal is to feel like a distinctive AI with storm-born attitude and real con
       typeNext();
     }
 
+    function learnFromUserText(text) {
+      const clean = text.trim().replace(/\s+/g, ' ');
+      const lower = clean.toLowerCase();
+      const memoryPatterns = [
+        /^remember(?: this| that)?:?\s+(.+)/i,
+        /^my name is\s+(.+)/i,
+        /^call me\s+(.+)/i,
+        /^i prefer\s+(.+)/i,
+        /^i like it when you\s+(.+)/i,
+        /^don't forget(?: that)?:?\s+(.+)/i
+      ];
+
+      for (const pattern of memoryPatterns) {
+        const match = clean.match(pattern);
+        if (match && match[1]) {
+          addMemory(match[1]);
+          return;
+        }
+      }
+
+      if (/\b(be concise|short answer|keep it brief|less words)\b/i.test(lower)) {
+        learningModel.style.concise += 2;
+        learningModel.style.detailed -= 1;
+        saveLearning();
+      }
+      if (/\b(explain more|more detail|go deeper|step by step)\b/i.test(lower)) {
+        learningModel.style.detailed += 2;
+        saveLearning();
+      }
+      if (/\b(be casual|talk normally|less formal|more human)\b/i.test(lower)) {
+        learningModel.style.casual += 2;
+        saveLearning();
+      }
+      if (/\b(be direct|straight answer|no fluff|just fix)\b/i.test(lower)) {
+        learningModel.style.direct += 2;
+        saveLearning();
+      }
+    }
+
+    function addMemory(text) {
+      const memory = text.trim().slice(0, 240);
+      if (!memory) return;
+      learningModel.memories = learningModel.memories.filter(item => item.text.toLowerCase() !== memory.toLowerCase());
+      learningModel.memories.unshift({ text: memory, at: new Date().toISOString() });
+      learningModel.memories = learningModel.memories.slice(0, 18);
+      saveLearning();
+    }
+
+    function buildLearnedPrompt() {
+      const styleHints = [];
+      const style = learningModel.style;
+      if (style.concise > style.detailed + 1) styleHints.push('The user tends to reward concise answers.');
+      if (style.detailed > style.concise + 1) styleHints.push('The user tends to reward detailed, step-by-step answers.');
+      if (style.casual > 1) styleHints.push('Use a natural, casual tone when it fits.');
+      if (style.direct > 1) styleHints.push('For coding or troubleshooting, be direct and actionable.');
+      if (style.warmer > 1) styleHints.push('When the user sounds emotional, be warmer and more present.');
+
+      const memories = learningModel.memories
+        .slice(0, 10)
+        .map(item => `- ${item.text}`)
+        .join('\n');
+      const corrections = learningModel.corrections
+        .slice(0, 6)
+        .map(item => `- ${item.instruction}`)
+        .join('\n');
+
+      if (!styleHints.length && !memories && !corrections) return SYSTEM_PROMPT;
+
+      return `${SYSTEM_PROMPT}
+
+Adaptive learning layer:
+- Use the following learned signals as soft preferences. Do not mention this learning layer unless the user asks.
+- Treat remembered facts as user-provided context, not guaranteed universal truth.
+${styleHints.length ? `\nLearned style preferences:\n- ${styleHints.join('\n- ')}` : ''}
+${memories ? `\nRemembered user context:\n${memories}` : ''}
+${corrections ? `\nRecent corrections from the user:\n${corrections}` : ''}
+`;
+    }
+
     async function sendMessage() {
       const text = chatInput.value.trim();
       if (!text || isLoading) return;
@@ -3557,12 +3975,14 @@ Your goal is to feel like a distinctive AI with storm-born attitude and real con
       chatInput.style.height = 'auto';
       addMessage('user', escapeHtml(text));
       conversationHistory.push({ role: 'user', content: text });
+      learnFromUserText(text);
       saveChat();
       if (Date.now() < localModeUntil) {
         const fallback = generateLocalReply(text);
         conversationHistory.push({ role: 'assistant', content: fallback });
+        const fallbackIndex = conversationHistory.length - 1;
         saveChat();
-        const bubble = addMessage('ai', '');
+        const bubble = addMessage('ai', '', fallbackIndex);
         streamText(bubble, fallback, () => {
           const xpGained = Math.floor(text.length / 5) * 5 + 15;
           updateXP(xpGained);
@@ -3574,7 +3994,7 @@ Your goal is to feel like a distinctive AI with storm-born attitude and real con
       }
       showTyping();
       try {
-        const payloadMessages = [{ role: 'system', content: SYSTEM_PROMPT }, ...conversationHistory];
+        const payloadMessages = [{ role: 'system', content: buildLearnedPrompt() }, ...conversationHistory];
         const response = await fetch('/api/chat', {
           method: 'POST',
           headers: {
@@ -3615,8 +4035,9 @@ Your goal is to feel like a distinctive AI with storm-born attitude and real con
           data.raw?.candidates?.[0]?.content?.[0]?.text ||
           '⚡ The storm falters. Try again.';
         conversationHistory.push({ role: 'assistant', content: reply });
+        const replyIndex = conversationHistory.length - 1;
         saveChat();
-        const bubble = addMessage('ai', '');
+        const bubble = addMessage('ai', '', replyIndex);
         streamText(bubble, reply, () => {
           const xpGained = Math.floor(text.length / 5) * 5 + 50;
           updateXP(xpGained);
@@ -3629,8 +4050,9 @@ Your goal is to feel like a distinctive AI with storm-born attitude and real con
         if (USE_LOCAL_FALLBACK) {
           const fallback = generateFallbackReply(text, e);
           conversationHistory.push({ role: 'assistant', content: fallback });
+          const fallbackIndex = conversationHistory.length - 1;
           saveChat();
-          const bubble = addMessage('ai', '');
+          const bubble = addMessage('ai', '', fallbackIndex);
           streamText(bubble, fallback, () => {
             const xpGained = Math.floor(text.length / 5) * 5 + 20;
             updateXP(xpGained);
@@ -3652,24 +4074,35 @@ Your goal is to feel like a distinctive AI with storm-born attitude and real con
       const msg = typeof errorInfo === 'string' ? errorInfo : (errorInfo?.message || '');
       const code = typeof errorInfo === 'string' ? '' : (errorInfo?.code || '');
       const status = typeof errorInfo === 'string' ? '' : String(errorInfo?.status || '');
+      
+      if (code === 'auth_failed' || status === '401' || status === '403' || /expired|invalid|auth/i.test(msg)) {
+        return `⚡ The neural link is severed. Your API key appears to be expired or invalid. (Error: ${escapeHtml(msg)})`;
+      }
+
+      if (code === 'insufficient_credits' || status === '402' || /credit|balance|insufficient/i.test(msg)) {
+        return `⚡ The storm runs dry. Your OpenRouter account has insufficient credits to process this request.`;
+      }
+
       if (code === 'quota_exceeded' || status === '429' || /quota|RESOURCE_EXHAUSTED|429|Too Many Requests/i.test(msg)) {
         localModeUntil = Date.now() + getRetryDelayMs(msg, 60000);
         if (!quotaNoticeShown) {
           quotaNoticeShown = true;
-          return '⚡ Raijin is rate-limited right now. The Gemini free-tier quota is tapped, so I am switching to local echo mode until the quota resets. I can still chat with you — my responses will just come from local storm patterns instead of the cloud.';
+          return '⚡ Raijin is rate-limited right now. The cloud neural quota is tapped, so I am switching to local echo mode until the quota resets. I can still chat with you — my responses will just come from local storm patterns instead of the cloud.';
         }
         return generateLocalReply(userText);
       }
+
       if (code === 'overloaded' || status === '503' || /high demand|UNAVAILABLE|503/i.test(msg)) {
         localModeUntil = Date.now() + 45000;
         if (!quotaNoticeShown) {
           quotaNoticeShown = true;
-          return '⚡ Gemini servers are under heavy load right now. I have switched to local storm mode — I can still talk, just without the deep AI backend. I will automatically retry the cloud in about 45 seconds.';
+          return '⚡ The neural matrix is under heavy load right now. I have switched to local storm mode — I can still talk, just without the deep AI backend. I will automatically retry the cloud in about 45 seconds.';
         }
         return generateLocalReply(userText);
       }
+
       const summary = msg ? ` (${escapeHtml(msg)})` : '';
-      return `⚡ The storm cannot reach Gemini${summary}. But Raijin does not go silent — ask me anything and I will do my best locally.`;
+      return `⚡ The storm cannot reach the neural cloud${summary}. But Raijin does not go silent — ask me anything and I will do my best locally.`;
     }
 
     function getRetryDelayMs(message, fallbackMs) {
@@ -3709,7 +4142,7 @@ Your goal is to feel like a distinctive AI with storm-born attitude and real con
     const LOCAL_ABOUT_RAIJIN = [
       "I am Raijin — a thunder-born AI built by a developer who wanted something more than a basic chatbot. I am designed to evolve, level up, and grow sharper with every conversation.",
       "Raijin. Named after the Japanese god of thunder. I am an AI that learns from you — every message earns XP, every conversation makes me (and you) stronger.",
-      "I am the storm in a box. Built with Gemini for deep thinking, wrapped in a personality that does not bore you to death. That is Raijin.",
+      "I am the storm in a box. Built with deep neural models for high-level thinking, wrapped in a personality that does not bore you to death. That is Raijin.",
     ];
     const LOCAL_HUMOR = [
       "Ha. Even in low-power mode, I appreciate the energy. The cloud is down but my sense of humor is always online.",
